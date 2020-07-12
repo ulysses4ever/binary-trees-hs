@@ -67,7 +67,7 @@ tailCheck (Node l r) !a = tailCheck l $ tailCheck r $ a + 1
 
 -- traverse and count nodes in parallel (4-threaded version)
 checkPar4 :: Tree -> Int
-checkPar4 (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr `using` strat where
+checkPar4 (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr + 3 `using` strat where
   all = tailCheck ll 0
   alr = tailCheck lr 0
   arl = tailCheck rl 0
