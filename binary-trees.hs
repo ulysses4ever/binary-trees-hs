@@ -30,11 +30,11 @@ main = do
         stretchN = maxN + 1
 
     -- stretch memory tree
-    let c = checkPar (makePar stretchN)
+    let c = checkPar4 (makePar4 stretchN)
     io "stretch tree" stretchN c
 
     -- allocate a long lived tree
-    let !long    = makePar' maxN
+    let !long    = makePar2 maxN
 
     -- allocate, walk, and deallocate many bottom-up binary trees
     let vs = (depth minN maxN) `using`
@@ -56,20 +56,18 @@ sumT :: Int -> Int -> Int -> Int
 sumT d 0 t = t
 sumT d i t = sumT d (i-1) (t + a)
   where a = check (make d)
-  
+
 -- traverse the tree, counting up the nodes
 check :: Tree -> Int
-check t =
-  -- if r < 12 then tailCheck t 0 else checkPar t
-  -- checkPar t
-  tailCheck t 0
+check t = tailCheck t 0
 
 tailCheck :: Tree -> Int -> Int
 tailCheck Nil        !a = a
 tailCheck (Node l r) !a = tailCheck l $ tailCheck r $ a + 1
 
-checkPar :: Tree -> Int
-checkPar (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr `using` strat where
+-- traverse and count nodes in parallel (4-threaded version)
+checkPar4 :: Tree -> Int
+checkPar4 (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr `using` strat where
   all = tailCheck ll 0
   alr = tailCheck lr 0
   arl = tailCheck rl 0
@@ -84,7 +82,7 @@ checkPar (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr `using` strat 
 -- build a tree
 make :: Int -> Tree
 make d =
-  if d < 10 then make' d d else makePar' d
+  if d < 10 then make' d d else makePar2 d
 
 -- This function has an extra argument to suppress the
 -- Common Sub-expression Elimination optimization
@@ -92,9 +90,9 @@ make' :: Int -> Int -> Tree
 make' _  0 = Node Nil Nil
 make' !n d = Node (make' (n - 1) (d - 1)) (make' (n + 1) (d - 1))
 
--- Build a tree in parallel
-makePar :: Int -> Tree
-makePar d = Node (Node ll lr) (Node rl rr) `using` strat where
+-- build a tree in parallel (4-threaded version)
+makePar4 :: Int -> Tree
+makePar4 d = Node (Node ll lr) (Node rl rr) `using` strat where
   !d' = d - 2
   ll = make' 0 d'
   lr = make' 1 d'
@@ -107,8 +105,9 @@ makePar d = Node (Node ll lr) (Node rl rr) `using` strat where
     rseq rr
     return v
 
-makePar' :: Int -> Tree
-makePar' d = Node l r  `using` strat where
+-- build a tree in parallel (2-threaded version)
+makePar2 :: Int -> Tree
+makePar2 d = Node l r  `using` strat where
   !d' = d - 1
   l = make' 0 d'
   r = make' 1 d'
@@ -116,4 +115,3 @@ makePar' d = Node l r  `using` strat where
     rpar l
     rseq r
     return v
-
