@@ -1,10 +1,9 @@
-{-#LANGUAGE BangPatterns#-}
 --
 -- The Computer Language Benchmarks Game
 -- https://salsa.debian.org/benchmarksgame-team/benchmarksgame/
 --
 -- Contributed by Don Stewart
--- Basic parallelization by Roman Kashitsyn
+-- Basic parallelization by Roman Kashitsyn and Artem Pelenitsyn
 -- Tail call optimizations by Izaak Weiss
 --
 
@@ -31,46 +30,90 @@ main = do
         stretchN = maxN + 1
 
     -- stretch memory tree
-    let c = check (make stretchN)
+    let c = checkPar (makePar stretchN)
     io "stretch tree" stretchN c
 
     -- allocate a long lived tree
-    let !long    = make maxN
+    let !long    = makePar' maxN
 
     -- allocate, walk, and deallocate many bottom-up binary trees
-    let vs = (depth minN maxN) `using` (parList $ evalTuple3 r0 r0 rseq)
+    let vs = (depth minN maxN) `using`
+             (parList $ evalTuple3 r0 r0 rseq)
     mapM_ (\((m,d,i)) -> io (show m ++ "\t trees") d i) vs
 
     -- confirm the the long-lived binary tree still exists
     io "long lived tree" maxN (check long)
 
--- generate many trees
+-- generate trees of depth @d@, @d+1@... until @m@
 depth :: Int -> Int -> [(Int, Int, Int)]
 depth d m
     | d <= m    = (n, d, sumT d n 0) : depth (d+2) m
     | otherwise = []
   where n = 1 `shiftL` (m - d + minN)
 
--- allocate and check lots of trees
+-- allocate and check @i@ trees of depth @d@
 sumT :: Int -> Int -> Int -> Int
 sumT d 0 t = t
 sumT d i t = sumT d (i-1) (t + a)
   where a = check (make d)
-
+  
 -- traverse the tree, counting up the nodes
 check :: Tree -> Int
-check t = tailCheck t 0
+check t =
+  -- if r < 12 then tailCheck t 0 else checkPar t
+  -- checkPar t
+  tailCheck t 0
 
 tailCheck :: Tree -> Int -> Int
 tailCheck Nil        !a = a
 tailCheck (Node l r) !a = tailCheck l $ tailCheck r $ a + 1
 
+checkPar :: Tree -> Int
+checkPar (Node (Node ll lr) (Node rl rr)) = all + alr + arl + arr `using` strat where
+  all = tailCheck ll 0
+  alr = tailCheck lr 0
+  arl = tailCheck rl 0
+  arr = tailCheck rr 0
+  strat v = do
+    rpar all
+    rpar alr
+    rpar arl
+    rseq arr
+    return v
+
 -- build a tree
 make :: Int -> Tree
-make d = make' d d
+make d =
+  if d < 10 then make' d d else makePar' d
 
 -- This function has an extra argument to suppress the
 -- Common Sub-expression Elimination optimization
 make' :: Int -> Int -> Tree
 make' _  0 = Node Nil Nil
 make' !n d = Node (make' (n - 1) (d - 1)) (make' (n + 1) (d - 1))
+
+-- Build a tree in parallel
+makePar :: Int -> Tree
+makePar d = Node (Node ll lr) (Node rl rr) `using` strat where
+  !d' = d - 2
+  ll = make' 0 d'
+  lr = make' 1 d'
+  rl = make' 2 d'
+  rr = make' 3 d'
+  strat v = do
+    rpar ll
+    rpar lr
+    rpar rl
+    rseq rr
+    return v
+
+makePar' :: Int -> Tree
+makePar' d = Node l r  `using` strat where
+  !d' = d - 1
+  l = make' 0 d'
+  r = make' 1 d'
+  strat v = do
+    rpar l
+    rseq r
+    return v
+
