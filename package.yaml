@@ -1,0 +1,11 @@
+name: binary-trees
+dependencies:
+  - base == 4.*
+  - parallel
+  
+
+executables:
+  binary-trees:
+    main: binary-trees.hs
+    ghc-options: -fllvm -O2 -threaded -rtsopts "-with-rtsopts=-N4 -K128M -H -A64m"
+    default-extensions: BangPatterns

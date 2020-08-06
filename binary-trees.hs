@@ -37,9 +37,9 @@ main = do
     let !long    = makePar2 maxN
 
     -- allocate, walk, and deallocate many bottom-up binary trees
-    let vs = (depth minN maxN) `using`
+    let vs = depth minN maxN `using`
              (parList $ evalTuple3 r0 r0 rseq)
-    mapM_ (\((m,d,i)) -> io (show m ++ "\t trees") d i) vs
+    mapM_ (\(m,d,i) -> io (show m ++ "\t trees") d i) vs
 
     -- confirm the the long-lived binary tree still exists
     io "long lived tree" maxN (check long)
